@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Жүзу жарысы: Ат пен Сиыр (2-ойыншы режимі)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e0f2fe;
+            background-image: radial-gradient(#bae6fd 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow-x: hidden;
+        }
+        
+        .wave-bg-vertical {
+            background: linear-gradient(180deg, #7dd3fc 0%, #0284c7 100%);
+            position: relative;
+        }
+        
+        .swimmer {
+            transition: bottom 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .finish-line-horizontal {
+            background-image: repeating-linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%, #000), repeating-linear-gradient(45deg, #000 25%, #fff 25%, #fff 75%, #000 75%, #000);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+        }
+
+        @keyframes confetti-fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        .confetti {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            animation: confetti-fall 3s linear infinite;
+        }
+
+        /* Анимация дұрыс/қате жауаптар үшін */
+        @keyframes pop {
+            0% { transform: scale(0.9); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <div id="root" class="flex-grow flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- СҰРАҚТАР БАЗАСЫ ---
+        const ALL_QUESTIONS = [
+            { q: "Ертегіде қандай жануарлар жарысады?", options: ["Ат пен Сиыр", "Суыр мен Арыстан", "Ат пен Түйе", "Сиыр мен Ешкі"], answer: 0 },
+            { q: "Ерте заманда Сиырдың мінезі қандай болған?", options: ["Жуас, момын", "Тәкаппар, мақтаншақ", "Еңбекқор, ақылды", "Жалқау, ұйқышыл"], answer: 1 },
+            { q: "Жарысқа кім төреші болып келеді?", options: ["Жолбарыс", "Аю", "Арыстан", "Қасқыр"], answer: 2 },
+            { q: "Ат пен Сиырды жарыс жолына кім айдап барады?", options: ["Арыстан", "Түлкі", "Суыр", "Жолбарыс"], answer: 3 },
+            { q: "Жол ортасында оларға сусын беру үшін кім тосып отырады?", options: ["Қоян", "Суыр", "Бұғы", "Ат"], answer: 1 },
+            { q: "Сиыр Суырдан суды қалай сұрайды?", options: ["Суыр сұңқар, су қайда?", "Суыр сасық, су қайда?", "Досым суыр, су берші", "Суыр батыр, су қайда?"], answer: 1 },
+            { q: "Дөрекі сөзі үшін Суыр Сиырға қандай су береді?", options: ["Мөлдір бұлақ суын", "Тәтті шырын", "Сасып, борсып кеткен лай су", "Мұздай таза су"], answer: 2 },
+            { q: "Ат Суырдан суды қалай сұрайды?", options: ["Суыр сасық, су қайда?", "Суыр сұңқар, су қайда?", "Суыр інім, су берші", "Суыр, маған су әкел!"], answer: 1 },
+            { q: "Атқа берілген су қандай еді?", options: ["Лай және сасық", "Тұзды су", "Мөлдір, тұнық су", "Құм араласқан су"], answer: 2 },
+            { q: "Таза су ішкеннен кейін Ат қалай сезінеді?", options: ["Іші ауырып қалады", "Бойына тың қуат қосылып, құстай ұшады", "Ұйқысы келіп жатып қалады", "Шаршап тоқтап қалады"], answer: 1 },
+            { q: "Жарыста кім мәреге бірінші болып жетеді?", options: ["Сиыр", "Екеуі бірге", "Ат", "Жарыс аяқталмады"], answer: 2 },
+            { q: "Неліктен Сиыр содан бері шабандап, жүгіре алмайтын күйге түсті?", options: ["Аяғын ауыртып алды", "Лай, сасық су ішкендіктен", "Қартайып кетті", "Жүгіруге ерінді"], answer: 1 },
+            { q: "Жұмбақты шеш: Жылт-жылт еткен, Жылғадан өткен.", options: ["Күн сәулесі", "Су", "Жел", "Жұлдыз"], answer: 1 },
+            { q: "Жұмбақты шеш: Отқа жанбас, Суға батпас.", options: ["Тас", "Ағаш", "Мұз", "Темір"], answer: 2 },
+            { q: "Жұмбақты шеш: Қыста жер бетін басады, Жазда тауға қашады.", options: ["Қар", "Жаңбыр", "Бұлт", "Жапырақ"], answer: 0 }
+        ];
+
+        const shuffleArray = (array) => {
+            const newArr = [...array];
+            for (let i = newArr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+            }
+            return newArr;
+        };
+
+        const App = () => {
+            // Ойыншы 1 (Ат)
+            const [p1Pos, setP1Pos] = useState(0);
+            const [p1Questions, setP1Questions] = useState([]);
+            const [p1Index, setP1Index] = useState(0);
+            const [feedback1, setFeedback1] = useState({ show: false, isCorrect: false, msg: "" });
+
+            // Ойыншы 2 (Сиыр)
+            const [p2Pos, setP2Pos] = useState(0);
+            const [p2Questions, setP2Questions] = useState([]);
+            const [p2Index, setP2Index] = useState(0);
+            const [feedback2, setFeedback2] = useState({ show: false, isCorrect: false, msg: "" });
+
+            const [winner, setWinner] = useState(null);
+            const TARGET_SCORE = 6;
+
+            useEffect(() => {
+                initGame();
+            }, []);
+
+            const initGame = () => {
+                setP1Questions(shuffleArray(ALL_QUESTIONS));
+                setP2Questions(shuffleArray(ALL_QUESTIONS));
+                setP1Pos(0);
+                setP2Pos(0);
+                setP1Index(0);
+                setP2Index(0);
+                setFeedback1({ show: false });
+                setFeedback2({ show: false });
+                setWinner(null);
+            };
+
+            const handleAnswer = (playerNum, selectedOptionIdx) => {
+                if (winner) return;
+
+                if (playerNum === 1) {
+                    if (feedback1.show) return; // Күте тұру керек
+                    const currentQ = p1Questions[p1Index];
+                    const isCorrect = selectedOptionIdx === currentQ.answer;
+                    
+                    if (isCorrect) {
+                        const newPos = p1Pos + 1;
+                        setP1Pos(newPos);
+                        setFeedback1({ show: true, isCorrect, msg: "+1 қадам!" });
+                        if (newPos >= TARGET_SCORE) {
+                            setTimeout(() => setWinner(1), 500);
+                            return;
+                        }
+                    } else {
+                        setFeedback1({ show: true, isCorrect, msg: "Қате!" });
+                    }
+
+                    setTimeout(() => {
+                        setFeedback1({ show: false });
+                        setP1Index((prev) => (prev + 1) % p1Questions.length);
+                    }, 1500);
+
+                } else {
+                    if (feedback2.show) return;
+                    const currentQ = p2Questions[p2Index];
+                    const isCorrect = selectedOptionIdx === currentQ.answer;
+                    
+                    if (isCorrect) {
+                        const newPos = p2Pos + 1;
+                        setP2Pos(newPos);
+                        setFeedback2({ show: true, isCorrect, msg: "+1 қадам!" });
+                        if (newPos >= TARGET_SCORE) {
+                            setTimeout(() => setWinner(2), 500);
+                            return;
+                        }
+                    } else {
+                        setFeedback2({ show: true, isCorrect, msg: "Қате!" });
+                    }
+
+                    setTimeout(() => {
+                        setFeedback2({ show: false });
+                        setP2Index((prev) => (prev + 1) % p2Questions.length);
+                    }, 1500);
+                }
+            };
+
+            // Ойын аяқталғандағы экран
+            if (winner) {
+                return (
+                    <div className="flex-grow flex items-center justify-center p-4">
+                        <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-12 text-center relative overflow-hidden border-8 border-yellow-400">
+                            {Array.from({ length: 40 }).map((_, i) => (
+                                <div key={i} className="confetti" style={{
+                                    left: `${Math.random() * 100}%`,
+                                    animationDuration: `${Math.random() * 3 + 2}s`,
+                                    animationDelay: `${Math.random() * 2}s`,
+                                    backgroundColor: ['#fcd34d', '#60a5fa', '#34d399', '#f87171', '#a78bfa'][Math.floor(Math.random() * 5)]
+                                }}></div>
+                            ))}
+                            
+                            <h2 className="text-6xl mb-6 text-gray-800 font-extrabold drop-shadow-sm">ЖАРЫС АЯҚТАЛДЫ! 🎉</h2>
+                            <div className="text-9xl my-8 animate-bounce">
+                                {winner === 1 ? '🐴' : '🐄'}
+                            </div>
+                            <h3 className={`text-4xl font-bold mb-8 ${winner === 1 ? 'text-indigo-600' : 'text-amber-600'}`}>
+                                {winner === 1 ? '1-ОЙЫНШЫ (АТ)' : '2-ОЙЫНШЫ (СИЫР)'} ЖЕҢІСКЕ ЖЕТТІ!
+                            </h3>
+                            
+                            <button 
+                                onClick={initGame}
+                                className="mt-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-5 px-12 rounded-full text-2xl shadow-xl hover:scale-105 transition-transform"
+                            >
+                                ҚАЙТА ОЙНАУ
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex-grow flex flex-col p-4">
+                    {/* Бас тақырып */}
+                    <div className="text-center mb-6">
+                        <h1 className="text-3xl font-extrabold text-blue-900 drop-shadow-sm">Суыр сұңқар - Жүзу жарысы 🌊</h1>
+                        <p className="text-gray-600">Кім бірінші 6 сұраққа дұрыс жауап берсе, сол жеңеді! Бір уақытта жауап бере беріңіздер.</p>
+                    </div>
+
+                    {/* Негізгі ойын алаңы (3 баған) */}
+                    <div className="flex-grow flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto w-full">
+                        
+                        {/* 1-ОЙЫНШЫ (Сол жақ) */}
+                        <div className="flex-1 flex flex-col bg-indigo-50 border-4 border-indigo-200 rounded-2xl shadow-lg p-5 relative overflow-hidden">
+                            <div className="text-center mb-4">
+                                <h2 className="text-2xl font-bold text-indigo-800 flex items-center justify-center gap-2">
+                                    <span className="text-3xl">🐴</span> 1-Ойыншы (Ат)
+                                </h2>
+                                <p className="font-semibold text-indigo-600 bg-indigo-100 inline-block px-3 py-1 rounded-full mt-2">
+                                    Жауаптар: {p1Pos} / {TARGET_SCORE}
+                                </p>
+                            </div>
+
+                            {p1Questions.length > 0 && (
+                                <div className="flex-grow flex flex-col justify-center relative">
+                                    {/* Feedback қабаты */}
+                                    {feedback1.show && (
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-indigo-50/90 backdrop-blur-sm rounded-xl">
+                                            <div className={`text-4xl font-black py-6 px-10 rounded-2xl shadow-2xl animate-pop ${feedback1.isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                {feedback1.isCorrect ? '✅ ' : '❌ '}{feedback1.msg}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-white p-5 rounded-xl shadow mb-6 border-l-4 border-indigo-500 min-h-[100px] flex items-center justify-center text-center">
+                                        <p className="text-xl font-bold text-gray-800">
+                                            {p1Questions[p1Index].q}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {p1Questions[p1Index].options.map((opt, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleAnswer(1, idx)}
+                                                disabled={feedback1.show}
+                                                className="w-full text-left p-4 rounded-xl font-medium text-lg border-2 bg-white border-indigo-100 hover:border-indigo-500 hover:bg-indigo-100 text-indigo-900 transition-colors shadow-sm active:scale-95"
+                                            >
+                                                <span className="inline-block w-8 h-8 rounded-full bg-indigo-200 text-center leading-8 mr-3 text-indigo-800 font-bold shadow-inner">
+                                                    {['A', 'Ә', 'Б', 'В'][idx]}
+                                                </span>
+                                                {opt}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ОРТАДАҒЫ ЖҮЗУ ЖОЛЫ (Вертикаль) */}
+                        <div className="w-full lg:w-48 h-64 lg:h-auto flex-shrink-0 bg-blue-200 border-4 border-blue-400 rounded-2xl overflow-hidden shadow-inner flex flex-col relative">
+                            {/* Мәре сызығы */}
+                            <div className="absolute top-0 left-0 right-0 h-10 finish-line-horizontal z-10 opacity-90 border-b-4 border-yellow-400 shadow-md"></div>
+                            
+                            {/* Бассейн фоны */}
+                            <div className="flex-grow wave-bg-vertical flex relative">
+                                
+                                {/* 1-Жолақ (Ат) */}
+                                <div className="flex-1 border-r border-white/40 relative">
+                                    {[0,1,2,3,4,5,6].map(step => (
+                                        <div key={`track1-${step}`} className="absolute left-0 right-0 h-px bg-white/50" style={{ bottom: `${(step/TARGET_SCORE)*100}%` }}>
+                                            <span className="absolute -top-3 left-1 text-xs text-white/70 font-bold">{step}</span>
+                                        </div>
+                                    ))}
+                                    {/* Ат кейіпкері */}
+                                    <div 
+                                        className="swimmer absolute w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-lg border-4 border-indigo-500 z-20 left-1/2 -translate-x-1/2"
+                                        style={{ bottom: `calc(${(p1Pos / TARGET_SCORE) * 100}% - ${(p1Pos / TARGET_SCORE) * 56}px)` }}
+                                    >
+                                        🐴
+                                    </div>
+                                </div>
+
+                                {/* 2-Жолақ (Сиыр) */}
+                                <div className="flex-1 relative">
+                                    {[0,1,2,3,4,5,6].map(step => (
+                                        <div key={`track2-${step}`} className="absolute left-0 right-0 h-px bg-white/50" style={{ bottom: `${(step/TARGET_SCORE)*100}%` }}></div>
+                                    ))}
+                                    {/* Сиыр кейіпкері */}
+                                    <div 
+                                        className="swimmer absolute w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-lg border-4 border-amber-500 z-20 left-1/2 -translate-x-1/2"
+                                        style={{ bottom: `calc(${(p2Pos / TARGET_SCORE) * 100}% - ${(p2Pos / TARGET_SCORE) * 56}px)` }}
+                                    >
+                                        🐄
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2-ОЙЫНШЫ (Оң жақ) */}
+                        <div className="flex-1 flex flex-col bg-amber-50 border-4 border-amber-200 rounded-2xl shadow-lg p-5 relative overflow-hidden">
+                            <div className="text-center mb-4">
+                                <h2 className="text-2xl font-bold text-amber-800 flex items-center justify-center gap-2">
+                                    2-Ойыншы (Сиыр) <span className="text-3xl">🐄</span>
+                                </h2>
+                                <p className="font-semibold text-amber-600 bg-amber-100 inline-block px-3 py-1 rounded-full mt-2">
+                                    Жауаптар: {p2Pos} / {TARGET_SCORE}
+                                </p>
+                            </div>
+
+                            {p2Questions.length > 0 && (
+                                <div className="flex-grow flex flex-col justify-center relative">
+                                    {/* Feedback қабаты */}
+                                    {feedback2.show && (
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-amber-50/90 backdrop-blur-sm rounded-xl">
+                                            <div className={`text-4xl font-black py-6 px-10 rounded-2xl shadow-2xl animate-pop ${feedback2.isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                {feedback2.isCorrect ? '✅ ' : '❌ '}{feedback2.msg}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-white p-5 rounded-xl shadow mb-6 border-l-4 border-amber-500 min-h-[100px] flex items-center justify-center text-center">
+                                        <p className="text-xl font-bold text-gray-800">
+                                            {p2Questions[p2Index].q}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {p2Questions[p2Index].options.map((opt, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleAnswer(2, idx)}
+                                                disabled={feedback2.show}
+                                                className="w-full text-left p-4 rounded-xl font-medium text-lg border-2 bg-white border-amber-100 hover:border-amber-500 hover:bg-amber-100 text-amber-900 transition-colors shadow-sm active:scale-95"
+                                            >
+                                                <span className="inline-block w-8 h-8 rounded-full bg-amber-200 text-center leading-8 mr-3 text-amber-800 font-bold shadow-inner">
+                                                    {['A', 'Ә', 'Б', 'В'][idx]}
+                                                </span>
+                                                {opt}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
